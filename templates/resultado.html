@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Resultado de Ruta</title>
-    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <style>
         #map {
             height: 400px;
@@ -19,47 +19,35 @@
 
     <div id="map"></div>
 
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
         function initMap() {
-            var map = new google.maps.Map(document.getElementById('map'), {
-                zoom: 14,
-                center: {lat: {{ ruta[0][0] }}, lng: {{ ruta[0][1] }}}
+            var distribuidor = {{ distribuidor|tojson }};
+            var farmacias = {{ ruta|tojson }};
+            var map = L.map('map').setView([distribuidor[0], distribuidor[1]], 14);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+
+            L.marker([distribuidor[0], distribuidor[1]]).addTo(map).bindPopup('Distribuidor');
+
+            farmacias.forEach((coords, index) => {
+                L.marker([coords[0], coords[1]]).addTo(map).bindPopup('Farmacia ' + (index + 1));
             });
 
-            var rutas = {{ ruta|tojson }};
+            var latlngs = [distribuidor].concat(farmacias);
+            var polyline = L.polyline(latlngs, { 
+                color: 'blue',
+                weight: 8,
+                opacity: 0.5,
+                smoothFactor: 1.5
+            }).addTo(map);
 
-            // Añadir marcadores para el distribuidor y las farmacias
-            new google.maps.Marker({
-                position: {lat: rutas[0][0], lng: rutas[0][1]},
-                map: map,
-                title: 'Distribuidor'
-            });
-
-            for (let i = 1; i < rutas.length - 1; i++) {
-                new google.maps.Marker({
-                    position: {lat: rutas[i][0], lng: rutas[i][1]},
-                    map: map,
-                    title: 'Farmacia ' + i
-                });
-            }
-
-            new google.maps.Marker({
-                position: {lat: rutas[rutas.length - 1][0], lng: rutas[rutas.length - 1][1]},
-                map: map,
-                title: 'Regreso al Distribuidor'
-            });
-
-            // Dibujar la ruta
-            var flightPath = new google.maps.Polyline({
-                path: rutas.map(coord => ({lat: coord[0], lng: coord[1]})),
-                geodesic: true,
-                strokeColor: '#FF0000',
-                strokeOpacity: 1.0,
-                strokeWeight: 2
-            });
-
-            flightPath.setMap(map);
+            map.fitBounds(polyline.getBounds());
         }
+
         window.onload = initMap;
     </script>
 </body>
