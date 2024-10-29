@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Calcular Ruta</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <header>
+        <h1>Calcular Ruta de Medicamentos</h1>
+    </header>
+    <form action="/calcular_ruta" method="post" >
+        <label for="medicamento">Nombre del Medicamento:</label>
+        <input type="text" name="medicamento" required><br>
+        <label for="duracion_maxima">Duración Máxima (en minutos):</label>
+        <input type="number" name="duracion_maxima" required><br>
+        <label for="ubicacion_distribuidor">Ubicación del Distribuidor:</label>
+        <select name="ubicacion_distribuidor" required>
+            <option value="">Seleccione un distribuidor</option>
+            {% for distribuidor in distribuidores %}
+                <option value="{{ distribuidor }}">{{ distribuidor }}</option>
+            {% endfor %}
+        </select><br>
+        <label for="ubicaciones_farmacias">Ubicaciones de las Farmacias (lat,long en cada línea):</label>
+        <textarea name="ubicaciones_farmacias" required></textarea><br>
+        <div>
+            <input type="submit" value="Calcular Ruta">
+        </div>
+    </form>
+</body>
+</html>

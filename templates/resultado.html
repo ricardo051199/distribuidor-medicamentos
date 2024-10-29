@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resultado de Ruta</title>
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY"></script>
+    <style>
+        #map {
+            height: 400px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <h1>Ruta Óptima</h1>
+    <p>Ruta: {{ ruta }}</p>
+    <p>Tiempo Total: {{ tiempo }} minutos</p>
+
+    <div id="map"></div>
+
+    <script>
+        function initMap() {
+            var map = new google.maps.Map(document.getElementById('map'), {
+                zoom: 14,
+                center: {lat: {{ ruta[0][0] }}, lng: {{ ruta[0][1] }}}
+            });
+
+            var rutas = {{ ruta|tojson }};
+
+            // Añadir marcadores para el distribuidor y las farmacias
+            new google.maps.Marker({
+                position: {lat: rutas[0][0], lng: rutas[0][1]},
+                map: map,
+                title: 'Distribuidor'
+            });
+
+            for (let i = 1; i < rutas.length - 1; i++) {
+                new google.maps.Marker({
+                    position: {lat: rutas[i][0], lng: rutas[i][1]},
+                    map: map,
+                    title: 'Farmacia ' + i
+                });
+            }
+
+            new google.maps.Marker({
+                position: {lat: rutas[rutas.length - 1][0], lng: rutas[rutas.length - 1][1]},
+                map: map,
+                title: 'Regreso al Distribuidor'
+            });
+
+            // Dibujar la ruta
+            var flightPath = new google.maps.Polyline({
+                path: rutas.map(coord => ({lat: coord[0], lng: coord[1]})),
+                geodesic: true,
+                strokeColor: '#FF0000',
+                strokeOpacity: 1.0,
+                strokeWeight: 2
+            });
+
+            flightPath.setMap(map);
+        }
+        window.onload = initMap;
+    </script>
+</body>
+</html>
