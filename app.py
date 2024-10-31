@@ -2,6 +2,7 @@ from flask import Flask, render_template, request
 import random
 import pandas as pd
 import os
+import math
 
 app = Flask(__name__)
 
@@ -10,18 +11,32 @@ class Medicamento:
         self.nombre = nombre
         self.duracion_maxima = duracion_maxima
 
+def haversine(lat1, lon1, lat2, lon2):
+    R = 6371  # Radio de la Tierra en kilómetros
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = (math.sin(dlat / 2) ** 2 +
+         math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2)
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c  # Distancia en kilómetros
+
 def get_aptitud(ruta, medicamento):
     tiempo_total = 0
+    distancia_total = 0
+    velocidad_promedio = 25  # Velocidad promedio en km/h para ciudad
+
     for i in range(len(ruta) - 1):
         if len(ruta[i]) != 2 or len(ruta[i + 1]) != 2:
             print(f"Ruta inválida: {ruta}")
-            return float('inf')
+            return float('inf'), float('inf')
         
         x1, y1 = ruta[i]
         x2, y2 = ruta[i + 1]
-        tiempo_total += ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5  # Distancia euclidiana
+        distancia = haversine(x1, y1, x2, y2)  # Usar la fórmula de haversine
+        tiempo_total += (distancia / velocidad_promedio) * 60  # Tiempo en minutos
+        distancia_total += distancia  # Acumula la distancia total
 
-    return tiempo_total if tiempo_total <= medicamento.duracion_maxima else float('inf')
+    return tiempo_total if tiempo_total <= medicamento.duracion_maxima else float('inf'), distancia_total
 
 def algoritmo_genetico(distribuidor, farmacias, medicamento):
     poblacion = []
@@ -70,7 +85,7 @@ def calcular_ruta():
     distribuidor_data = df_distribuidores[df_distribuidores['Nombre'] == nombre_distribuidor]
 
     if distribuidor_data.empty:
-        return "Error: El distribuidor no se encontro."
+        return "Error: El distribuidor no se encontró."
 
     distribuidor_coords = (distribuidor_data['Latitud'].values[0], distribuidor_data['Longitud'].values[0])
 
@@ -82,11 +97,15 @@ def calcular_ruta():
                 return "Error: Cada farmacia debe tener dos coordenadas (lat,long)."
             farmacias_coords.append(coords)
         except ValueError:
-            return "Error: Coordenadas fuera de formato(lat,long)."
+            return "Error: Coordenadas fuera de formato (lat,long)."
 
-    ruta_optima, tiempo_total = algoritmo_genetico(distribuidor_coords, farmacias_coords, medicamento)
+    ruta_optima, (tiempo_total, distancia_total) = algoritmo_genetico(distribuidor_coords, farmacias_coords, medicamento)
 
-    return render_template('resultado.html', ruta=ruta_optima, tiempo=tiempo_total, distribuidor=distribuidor_coords)
+    # Redondear tiempo total y distancia a 2 decimales
+    tiempo_total = round(tiempo_total, 2)  # Tiempo en minutos
+    distancia_total = round(distancia_total, 2)  # Distancia en kilómetros
+
+    return render_template('ruta.html', ruta=ruta_optima, tiempo=tiempo_total, distancia=distancia_total, distribuidor=distribuidor_coords)
 
 if __name__ == '__main__':
     app.run(debug=True)
