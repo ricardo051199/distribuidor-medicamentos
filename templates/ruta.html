@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ruta</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet-routing-machine/3.2.12/leaflet-routing-machine.css" />
     <style>
         * {
             padding: 0;
@@ -20,25 +21,29 @@
             align-items: center;
             padding: 0 10vh;
             color: white;
-            display: flex;
             justify-content: space-between;
+        }
 
-            a {
-                color: white;
-                font-size: 1.5rem;
-                text-decoration: none;
-                padding: 2rem;
-            }
+        header a {
+            color: white;
+            font-size: 1.5rem;
+            text-decoration: none;
+            padding: 2rem;
+        }
 
-            a:hover {
-                background-color: rgba(255, 255, 255, 0.8);
-                color: #007BFF;
-                transition: all 0.25s;
-            }
+        header a:hover {
+            background-color: rgba(255, 255, 255, 0.8);
+            color: #007BFF;
+            transition: all 0.25s;
         }
 
         .principal {
             padding: 3vh 7.5%;
+        }
+
+        h2 {
+            margin-bottom: 4vh;
+            font-size: 2rem;
         }
 
         .contenido {
@@ -47,19 +52,6 @@
             width: 100%;
         }
 
-        h1 {
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
-        }  
-
-        h2 {
-            margin-bottom: 4vh;
-            font-size: 2rem;
-        }
-
-        h3 {
-            margin: 1rem 0;
-        }
-        
         .detalles {
             font-size: 1.5rem;
             background-color: rgba(52, 58, 64, 0.25);
@@ -86,44 +78,110 @@
         <h2>Ruta para distribuir medicamentos</h2>
         <div class="contenido">
             <div class="detalles">
-                <h3>Ruta: </h3>
-                <p>{{ ruta }}</p>
+                <h3>Ruta:</h3>
+                <p>
+                    {% for farmacia in ruta %}
+                        {{ farmacia.nombre }}{% if not loop.last %}, {% endif %}
+                    {% endfor %}
+                </p>
                 <h3>Distancia:</h3>
-                <p>{{ distancia }} km</p>
+                <p id="distancia">Calculada aproximadamente</p>
                 <h3>Tiempo Total:</h3>
-                <p>{{ tiempo }} minutos</p>
+                <p id="tiempo">Calculado con las coordenadas</p>
             </div>
             <div id="map"></div>
         </div>
     </div>
 
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-routing-machine/3.2.12/leaflet-routing-machine.min.js"></script>
     <script>
         function initMap() {
-            var distribuidor = {{ distribuidor|tojson }};
-            var farmacias = {{ ruta|tojson }};
-            var map = L.map('map').setView([distribuidor[0], distribuidor[1]], 14);
+            // Coordenadas del distribuidor (punto de partida)
+            var primeraFarmacia = {{ ruta[0].coords | tojson }};  // Primer elemento de la ruta
+
+            // Farmacias con nombre, altitud y longitud
+            var farmacias = {{ ruta | tojson }};
+
+            // Inicializar el mapa
+            var map = L.map('map').setView(primeraFarmacia, 14); // Usamos la primera farmacia como punto de partida
 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19,
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             }).addTo(map);
 
-            L.marker([distribuidor[0], distribuidor[1]]).addTo(map).bindPopup('Distribuidor');
+            // Agregar marcador para el distribuidor (partida) con color rojo
+            L.marker(primeraFarmacia, { color: 'red' }).addTo(map).bindPopup('Distribuidor: Inicio');
 
-            farmacias.forEach((coords, index) => {
-                L.marker([coords[0], coords[1]]).addTo(map).bindPopup('Farmacia ' + (index + 1));
+            // Función para calcular la distancia entre dos coordenadas
+            function calcularDistancia(lat1, lon1, lat2, lon2) {
+                var radLat1 = Math.PI * lat1 / 180;
+                var radLat2 = Math.PI * lat2 / 180;
+                var deltaLat = radLat2 - radLat1;
+                var deltaLon = Math.PI * (lon2 - lon1) / 180;
+                var a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) + Math.cos(radLat1) * Math.cos(radLat2) * Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2);
+                var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                var distancia = 6371 * c; // Distancia en km
+                return distancia;
+            }
+
+            // Ordenar farmacias por distancia desde el distribuidor
+            farmacias.forEach(function(farmacia, index) {
+                farmacia.distancia = calcularDistancia(primeraFarmacia[0], primeraFarmacia[1], farmacia.coords[0], farmacia.coords[1]);
+            });
+            farmacias.sort(function(a, b) { return a.distancia - b.distancia; });
+
+            // Agregar las paradas en el mapa y la ruta
+            var waypoints = [L.latLng(primeraFarmacia)]; // Empezamos desde la primera farmacia
+            var rutas = [];
+            var rutaParadas = [];
+            var numeroParada = 1;
+            // Crear la ruta desde el distribuidor a la primera parada (más cercana)
+            farmacias.forEach(function(farmacia, index) {
+                waypoints.push(L.latLng(farmacia.coords));
+
+                var distanciaKm = calcularDistancia(primeraFarmacia[0], primeraFarmacia[1], farmacia.coords[0], farmacia.coords[1]).toFixed(2);
+                var tiempoMinutos = Math.round(distanciaKm / 0.5); // Aproximación a 30 km/h
+
+                // Crear el marcador y agregar el popup con los detalles
+                L.marker(farmacia.coords, { color: 'blue' }).addTo(map)
+                    .bindPopup(`
+                        <strong>Farmacia:</strong> ${farmacia.nombre} <br>
+                        <strong>Número de Parada:</strong> ${numeroParada} <br>
+                        <strong>Distancia desde partida:</strong> ${distanciaKm} km <br>
+                        <strong>Tiempo estimado:</strong> ${tiempoMinutos} minutos
+                    `);
+
+                numeroParada++;
             });
 
-            var latlngs = [distribuidor].concat(farmacias);
-            var polyline = L.polyline(latlngs, { 
-                color: 'blue',
-                weight: 8,
-                opacity: 0.5,
-                smoothFactor: 1.5
+            var control = L.Routing.control({
+                waypoints: waypoints,
+                routeWhileDragging: false,
+                showAlternatives: false,
+                addWaypoints: false,
+                lineOptions: {
+                    styles: [{ color: 'blue', opacity: 0.8, weight: 6 }]
+                },
+                createMarker: function() { return null; }, // Desactiva los marcadores duplicados
+                router: L.Routing.osrmv1({ useHints: false })
             }).addTo(map);
 
-            map.fitBounds(polyline.getBounds());
+            // Deshabilitar el cuadro de instrucciones
+            control.on('routeselected', function() {
+                document.querySelector('.leaflet-routing-container').style.display = 'none';
+            });
+
+            // Calcular distancia y tiempo
+            control.on('routesfound', function(e) {
+                var ruta = e.routes[0];
+                var distanciaKm = (ruta.summary.totalDistance / 1000).toFixed(2);
+                var tiempoMinutos = Math.round(ruta.summary.totalTime / 60);
+
+                document.getElementById('distancia').innerText = `${distanciaKm} km`;
+                document.getElementById('tiempo').innerText = `${tiempoMinutos} minutos`;
+            });
         }
 
         window.onload = initMap;

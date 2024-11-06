@@ -12,42 +12,91 @@ class Medicamento:
         self.duracion_maxima = duracion_maxima
 
 def haversine(lat1, lon1, lat2, lon2):
-    R = 6371  # Radio de la Tierra en kilómetros
-    dlat = math.radians(lat2 - lat1)
-    dlon = math.radians(lon2 - lon1)
-    a = (math.sin(dlat / 2) ** 2 +
-         math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2)
+    # Asegúrate de que las coordenadas sean flotantes
+    lat1, lon1, lat2, lon2 = map(float, [lat1, lon1, lat2, lon2])
+
+    # Radio de la Tierra en kilómetros
+    R = 6371.0
+
+    # Conversion de grados a radianes
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    delta_phi = math.radians(lat2 - lat1)
+    delta_lambda = math.radians(lon2 - lon1)
+
+    # Fórmula de Haversine
+    a = math.sin(delta_phi / 2)**2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2)**2
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
     return R * c  # Distancia en kilómetros
 
+
 def get_aptitud(ruta, medicamento):
-    tiempo_total = 0
+    # Verificar si ruta es una lista
+    if not isinstance(ruta, list):
+        print(f"Error: 'ruta' no es una lista, es de tipo {type(ruta)}")
+        return 0  # O cualquier valor adecuado en caso de error
+    
     distancia_total = 0
-    velocidad_promedio = 25  # Velocidad promedio en km/h para ciudad
+    tiempo_total = 0
 
     for i in range(len(ruta) - 1):
-        if len(ruta[i]) != 2 or len(ruta[i + 1]) != 2:
-            print(f"Ruta inválida: {ruta}")
-            return float('inf'), float('inf')
+        print(f"Accediendo a ruta[{i}]: {ruta[i]}")
+
+        # Verificar que cada elemento sea un diccionario con la clave 'coords'
+        if not isinstance(ruta[i], dict) or "coords" not in ruta[i]:
+            print(f"Error: ruta[{i}] no tiene la estructura esperada: {ruta[i]}")
+            return 0
         
-        x1, y1 = ruta[i]
-        x2, y2 = ruta[i + 1]
-        distancia = haversine(x1, y1, x2, y2)  # Usar la fórmula de haversine
-        tiempo_total += (distancia / velocidad_promedio) * 60  # Tiempo en minutos
-        distancia_total += distancia  # Acumula la distancia total
+        # Obtener las coordenadas de las farmacias en la ruta
+        farmacia1 = ruta[i]
+        farmacia2 = ruta[i + 1]
 
-    return tiempo_total if tiempo_total <= medicamento.duracion_maxima else float('inf'), distancia_total
+        # Extraer las coordenadas directamente desde los diccionarios
+        lat1, lon1 = farmacia1["coords"]
+        lat2, lon2 = farmacia2["coords"]
 
-def algoritmo_genetico(distribuidor, farmacias, medicamento):
-    poblacion = []
-    for _ in range(100):
-        ruta = [distribuidor] + random.sample(farmacias, len(farmacias))
-        poblacion.append(ruta)
+        # Calcular la distancia usando Haversine
+        distancia_total += haversine(lat1, lon1, lat2, lon2)
 
+        # Aquí puedes agregar la lógica para el tiempo basado en la distancia o alguna otra fórmula
+        tiempo_total += calcular_tiempo(distancia_total)  # Esta es una función ejemplo para el cálculo del tiempo.
+
+    return distancia_total
+
+
+def calcular_tiempo(distancia_total):
+    # Suponiendo que la velocidad promedio es de 50 km/h
+    velocidad_promedio = 50  # km/h
+    tiempo_total = distancia_total / velocidad_promedio  # Tiempo en horas
+    return tiempo_total  # O cualquier otro cálculo relacionado con la aptitud
+
+def generar_poblacion_inicial(distribuidor_coords, farmacias_coords):
+    rutas = []
+    for _ in range(10):  # Población de ejemplo
+        # La ruta debe estar formada por diccionarios con nombre y coordenadas
+        ruta = [{"nombre": "Distribuidor", "coords": distribuidor_coords}] + \
+               [{"nombre": farmacia["nombre"], "coords": farmacia["coords"]} for farmacia in farmacias_coords]
+        rutas.append(ruta)
+    return rutas
+
+def algoritmo_genetico(distribuidor_coords, farmacias_coords, medicamento):
+    # Población inicial de rutas
+    poblacion = generar_poblacion_inicial(distribuidor_coords, farmacias_coords)
+
+    # Calcular la aptitud de cada ruta
     valores_aptitud = [get_aptitud(ruta, medicamento) for ruta in poblacion]
-    mejor_ruta = poblacion[valores_aptitud.index(min(valores_aptitud))]
-    
-    return mejor_ruta, min(valores_aptitud)
+
+    # Aquí puedes continuar con el algoritmo genético, usando las rutas que contienen tanto el nombre como las coordenadas
+    # Este paso depende de cómo implementes los operadores genéticos (cruce, mutación, etc.)
+
+    # Retornar la mejor ruta y sus valores asociados
+    mejor_ruta = poblacion[valores_aptitud.index(min(valores_aptitud))]  # O el mejor basado en el criterio que elijas
+    tiempo_total = calcular_tiempo(sum(valores_aptitud))  # Suponemos que el tiempo total depende de la distancia total
+    distancia_total = sum([get_aptitud(ruta, medicamento) for ruta in mejor_ruta])  # O lo que sea más adecuado
+
+    return mejor_ruta, (tiempo_total, distancia_total)
+
 
 def cargar_distribuidores():
     archivo = 'data/distribuidores.csv'
@@ -55,13 +104,12 @@ def cargar_distribuidores():
     if not os.path.exists(archivo):
         print(f"Error: El archivo {archivo} no se encuentra.")
         return pd.DataFrame()
+    df = pd.read_csv(archivo)
+    print(df)  # Verificar que se ha cargado correctamente el CSV
+    return df
 
-    try:
-        df = pd.read_csv(archivo)
-        return df
-    except Exception as e:
-        print(f"Error al cargar distribuidores: {e}")
-        return pd.DataFrame()
+
+
 
 @app.route('/')
 def index():
@@ -70,7 +118,7 @@ def index():
         return render_template('index.html', distribuidores=[], error="No se pudieron cargar los distribuidores.")
 
     distribuidores = df_distribuidores['Nombre'].tolist()
-    return render_template('index.html', distribuidores=distribuidores)
+    return render_template('index.html', distribuidores=distribuidores, )
 
 @app.route('/calcular_ruta', methods=['POST'])
 def calcular_ruta():
@@ -92,20 +140,31 @@ def calcular_ruta():
     farmacias_coords = []
     for farmacia in farmacias_raw:
         try:
-            coords = tuple(map(float, farmacia.split(',')))
+            # Procesar la farmacia de forma correcta
+            parts = farmacia.split(' - ')
+            nombre = parts[0].strip()
+            coords_str = parts[1].split('coords: ')[-1].strip().rstrip('.')
+            coords = tuple(map(float, coords_str.strip('[]').replace(' ', '').split(',')))
+
             if len(coords) != 2:
-                return "Error: Cada farmacia debe tener dos coordenadas (lat,long)."
-            farmacias_coords.append(coords)
-        except ValueError:
-            return "Error: Coordenadas fuera de formato (lat,long)."
+                return f"Error: Cada farmacia debe tener dos coordenadas (lat,long). Farmacia: {nombre}, Coordenadas: {coords}"
+
+            # Agregar a la lista de farmacias
+            farmacias_coords.append({"nombre": nombre, "coords": coords})
+
+        except ValueError as e:
+            return f"Error de formato: {e}. Farmacia: {farmacia}"
 
     ruta_optima, (tiempo_total, distancia_total) = algoritmo_genetico(distribuidor_coords, farmacias_coords, medicamento)
 
-    # Redondear tiempo total y distancia a 2 decimales
-    tiempo_total = round(tiempo_total, 2)  # Tiempo en minutos
-    distancia_total = round(distancia_total, 2)  # Distancia en kilómetros
+    tiempo_total = round(tiempo_total, 2)
+    distancia_total = round(distancia_total, 2)
 
-    return render_template('ruta.html', ruta=ruta_optima, tiempo=tiempo_total, distancia=distancia_total, distribuidor=distribuidor_coords)
+    ruta_optima_con_nombres = [{"nombre": farmacia["nombre"], "coords": farmacia["coords"]} for farmacia in ruta_optima]
+
+    print(ruta_optima_con_nombres)  # Verificar que se ha cargado correctamente el CSV
+
+    return render_template('ruta.html', ruta=ruta_optima_con_nombres, tiempo=tiempo_total, distancia=distancia_total, distribuidor=distribuidor_coords)
 
 if __name__ == '__main__':
     app.run(debug=True)

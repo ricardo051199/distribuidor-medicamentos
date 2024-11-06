@@ -1,0 +1,58 @@
+* {
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box;
+}
+
+header {
+    background-color: #007BFF;
+    width: 100%;
+    height: 20vh;
+    display: flex;
+    align-items: center;
+    padding: 0 10vh;
+    color: white;
+    justify-content: space-between;
+}
+
+header a {
+    color: white;
+    font-size: 1.5rem;
+    text-decoration: none;
+    padding: 2rem;
+}
+
+header a:hover {
+    background-color: rgba(255, 255, 255, 0.8);
+    color: #007BFF;
+    transition: all 0.25s;
+}
+
+.principal {
+    padding: 3vh 7.5%;
+}
+
+h2 {
+    margin-bottom: 4vh;
+    font-size: 2rem;
+}
+
+.contenido {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+}
+
+.detalles {
+    font-size: 1.5rem;
+    background-color: rgba(52, 58, 64, 0.25);
+    margin: 0 3vh 0 0;
+    padding: 10vh;
+}
+
+#map {
+    height: 60vh;
+    width: 100%;
+    border: none;
+    border-radius: 1rem;
+}

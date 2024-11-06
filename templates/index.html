@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <title>Calcular Ruta</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    
+    <link rel="stylesheet" href="/static/inicio.css">
 </head>
 <body>
     <header>
@@ -20,12 +21,22 @@
             {% for distribuidor in distribuidores %}
                 <option value="{{ distribuidor }}">{{ distribuidor }}</option>
             {% endfor %}
-        </select><br>
+        </select>        
+        <br>
         <label for="ubicaciones_farmacias">Ubicaciones de las Farmacias (lat,long en cada línea):</label>
-        <textarea name="ubicaciones_farmacias" required></textarea><br>
+        <textarea name="ubicaciones_farmacias" required oninput="autoResizeTextarea(this)"></textarea><br>
+        
         <div>
             <input type="submit" value="Calcular Ruta">
         </div>
     </form>
+
+    <script>
+        function autoResizeTextarea(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = textarea.scrollHeight + 'px';
+        }
+    </script>
+
 </body>
 </html>
