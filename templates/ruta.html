@@ -97,24 +97,19 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-routing-machine/3.2.12/leaflet-routing-machine.min.js"></script>
     <script>
         function initMap() {
-            // Coordenadas del distribuidor (punto de partida)
-            var primeraFarmacia = {{ ruta[0].coords | tojson }};  // Primer elemento de la ruta
+            var primeraFarmacia = {{ ruta[0].coords | tojson }};
 
-            // Farmacias con nombre, altitud y longitud
             var farmacias = {{ ruta | tojson }};
 
-            // Inicializar el mapa
-            var map = L.map('map').setView(primeraFarmacia, 14); // Usamos la primera farmacia como punto de partida
+            var map = L.map('map').setView(primeraFarmacia, 14);
 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19,
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             }).addTo(map);
 
-            // Agregar marcador para el distribuidor (partida) con color rojo
             L.marker(primeraFarmacia, { color: 'red' }).addTo(map).bindPopup('Distribuidor: Inicio');
 
-            // Función para calcular la distancia entre dos coordenadas
             function calcularDistancia(lat1, lon1, lat2, lon2) {
                 var radLat1 = Math.PI * lat1 / 180;
                 var radLat2 = Math.PI * lat2 / 180;
@@ -122,29 +117,25 @@
                 var deltaLon = Math.PI * (lon2 - lon1) / 180;
                 var a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) + Math.cos(radLat1) * Math.cos(radLat2) * Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2);
                 var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-                var distancia = 6371 * c; // Distancia en km
+                var distancia = 6371 * c;
                 return distancia;
             }
 
-            // Ordenar farmacias por distancia desde el distribuidor
             farmacias.forEach(function(farmacia, index) {
                 farmacia.distancia = calcularDistancia(primeraFarmacia[0], primeraFarmacia[1], farmacia.coords[0], farmacia.coords[1]);
             });
             farmacias.sort(function(a, b) { return a.distancia - b.distancia; });
 
-            // Agregar las paradas en el mapa y la ruta
-            var waypoints = [L.latLng(primeraFarmacia)]; // Empezamos desde la primera farmacia
+            var waypoints = [L.latLng(primeraFarmacia)]; 
             var rutas = [];
             var rutaParadas = [];
             var numeroParada = 1;
-            // Crear la ruta desde el distribuidor a la primera parada (más cercana)
             farmacias.forEach(function(farmacia, index) {
                 waypoints.push(L.latLng(farmacia.coords));
 
                 var distanciaKm = calcularDistancia(primeraFarmacia[0], primeraFarmacia[1], farmacia.coords[0], farmacia.coords[1]).toFixed(2);
-                var tiempoMinutos = Math.round(distanciaKm / 0.5); // Aproximación a 30 km/h
+                var tiempoMinutos = Math.round(distanciaKm / 0.5);
 
-                // Crear el marcador y agregar el popup con los detalles
                 L.marker(farmacia.coords, { color: 'blue' }).addTo(map)
                     .bindPopup(`
                         <strong>Farmacia:</strong> ${farmacia.nombre} <br>
@@ -164,16 +155,14 @@
                 lineOptions: {
                     styles: [{ color: 'blue', opacity: 0.8, weight: 6 }]
                 },
-                createMarker: function() { return null; }, // Desactiva los marcadores duplicados
+                createMarker: function() { return null; },
                 router: L.Routing.osrmv1({ useHints: false })
             }).addTo(map);
 
-            // Deshabilitar el cuadro de instrucciones
             control.on('routeselected', function() {
                 document.querySelector('.leaflet-routing-container').style.display = 'none';
             });
 
-            // Calcular distancia y tiempo
             control.on('routesfound', function(e) {
                 var ruta = e.routes[0];
                 var distanciaKm = (ruta.summary.totalDistance / 1000).toFixed(2);
